@@ -97,7 +97,7 @@ def main():
         encode_kwargs={'normalize_embeddings': True}
     )
     
-    json_path = r"C:\Users\parth\Desktop\Projects\News-Article-RAG-Agent\News-Article-RAG-Agent\Test\Dataset\News_Category_Dataset_v3.json\News_Category_Dataset_v3.json"
+    json_path = r"C:\Users\parth\Desktop\Projects\News-Article-RAG-Agent\News-Article-RAG-Agent\Test\Dataset\News_Category_Dataset_v3.json"
     print(f"Loading dataset from: {json_path}")
     
     if not os.path.exists(json_path):

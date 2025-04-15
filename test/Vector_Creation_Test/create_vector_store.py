@@ -9,6 +9,7 @@ import time
 from urllib.parse import urlparse
 import spacy
 from tqdm import tqdm
+from typing import Dict, List
 
 nlp = spacy.load("en_core_web_sm")
 
@@ -43,101 +44,73 @@ def fetch_article_content(url):
         print(f"Error fetching article from {url}: {str(e)}")
         return None
 
-def process_news_data(json_path, limit=20):
-    print(f"Processing first {limit} records from the dataset...")
-    with open(json_path, 'r', encoding='utf-8') as f:
-        data = [json.loads(line) for line in f.readlines()[:limit]]
-    
+def load_news_data(file_path: str, max_articles: int = 20) -> List[Dict]:
+    with open(file_path, 'r', encoding='utf-8') as f:
+        articles = []
+        for i, line in enumerate(f):
+            if i >= max_articles:
+                break
+            article = json.loads(line)
+            articles.append(article)
+    return articles
+
+def process_news_data(articles: List[Dict]) -> List[Document]:
     documents = []
-    
-    for item in tqdm(data, desc="Processing articles"):
-        article_content = ""
-        if item['link'] and urlparse(item['link']).scheme:
-            print(f"\nFetching content from: {item['link']}")
-            article_content = fetch_article_content(item['link'])
-            time.sleep(1)  
+    for article in articles:
+        # Combine headline and short_description for better context
+        content = f"{article['headline']}\n\n{article['short_description']}"
         
-        text_parts = [
-            f"CATEGORY: {item['category']}",
-            f"HEADLINE: {item['headline']}",
-            f"AUTHORS: {', '.join(item['authors'])}",
-            f"DESCRIPTION: {item['short_description']}"
-        ]
-        
-        if article_content:
-            text_parts.append(f"CONTENT: {article_content}")
-        
-        text = "\n\n".join(text_parts)
-        
-        entities = extract_entities(text)
-        entities_str = entities_to_string(entities)
-        
-        metadata = {
-            'category': item['category'],
-            'headline': item['headline'],
-            'authors': ', '.join(item['authors']),
-            'link': item['link'],
-            'date': item['date'],
-            'has_full_content': bool(article_content),
-            'entities': entities_str
-        }
-        
-        documents.append(Document(page_content=text, metadata=metadata))
-    
+        # Create document with all metadata fields
+        doc = Document(
+            page_content=content,
+            metadata={
+                "headline": article['headline'],
+                "category": article['category'],
+                "date": article['date'],
+                "link": article['link'],
+                "authors": article['authors'],
+                "short_description": article['short_description']
+            }
+        )
+        documents.append(doc)
     return documents
 
-def main():
-    print("Initializing vector store creation...")
-    
-    print("Loading embeddings model...")
-    model_name = "sentence-transformers/all-mpnet-base-v2"
+def create_vector_store(documents: List[Document], persist_dir: str):
     embeddings = HuggingFaceEmbeddings(
-        model_name=model_name,
+        model_name="sentence-transformers/all-mpnet-base-v2",
         model_kwargs={'device': 'cpu'},
         encode_kwargs={'normalize_embeddings': True}
     )
-    
-    json_path = r"C:\Users\parth\Desktop\Projects\News-Article-RAG-Agent\News-Article-RAG-Agent\Test\Dataset\News_Category_Dataset_v3.json"
-    print(f"Loading dataset from: {json_path}")
-    
-    if not os.path.exists(json_path):
-        print(f"Error: Dataset file not found at {json_path}")
-        return
-        
-    documents = process_news_data(json_path, limit=20)
-    
-    print("Splitting documents...")
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=2000, 
-        chunk_overlap=400,  
-        separators=["\n\n", "\n", ".", "!", "?", ",", " ", ""]  
+    vectorstore = Chroma.from_documents(
+        documents=documents,
+        embedding=embeddings,
+        persist_directory=persist_dir
     )
+    vectorstore.persist()
+    return vectorstore
+
+def main():
+    print("Loading news data...")
+    articles = load_news_data("News_Category_Dataset_v3.json")
+    print(f"Loaded {len(articles)} articles")
+    print("Processing articles...")
+    documents = process_news_data(articles)
+    print(f"Processed {len(documents)} documents")
     
-    splits = text_splitter.split_documents(documents)
-    
-    print("Creating and persisting vector store...")
+    print("Creating vector store...")
     persist_dir = os.path.join(os.path.dirname(__file__), "chroma_db")
-    print(f"Vector store will be saved to: {persist_dir}")
+    vectorstore = create_vector_store(documents, persist_dir)
+    print(f"Vector store created and persisted to {persist_dir}")
     
-    try:
-        vectorstore = Chroma.from_documents(
-            documents=splits,
-            embedding=embeddings,
-            persist_directory=persist_dir
-        )
-        
-        vectorstore.persist()
-        print("\nVector database created and persisted successfully!")
-        print(f"Total documents processed: {len(documents)}")
-        print(f"Total chunks created: {len(splits)}")
-        
-        if os.path.exists(persist_dir):
-            print(f"Vector store directory exists at: {persist_dir}")
-        else:
-            print("Warning: Vector store directory was not created")
-            
-    except Exception as e:
-        print(f"Error creating vector store: {str(e)}")
+    print("\nVerifying vector store contents...")
+    collection = vectorstore._collection
+    docs = collection.get()
+    print(f"Total documents in vector store: {len(docs['ids'])}")
+    print("\nSample document metadata:")
+    if docs['metadatas']:
+        sample_metadata = docs['metadatas'][0]
+        for key, value in sample_metadata.items():
+            print(f"{key}: {value}")
 
 if __name__ == "__main__":
     main() 

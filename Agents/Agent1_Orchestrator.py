@@ -149,8 +149,14 @@ def process_query(query: str) -> Dict[str, str]:
     return orchestrator.process_query(query)
 
 def main():
+    import sys
+    if len(sys.argv) > 1:
+        query = " ".join(sys.argv[1:])
         response = process_query(query)
         print(f"Response: {response}")
+    else:
+        print("Please provide a query as a command line argument.")
+        print("Example: python Agent1_Orchestrator.py 'What's the latest news about AI?'")
 
 if __name__ == "__main__":
     main() 

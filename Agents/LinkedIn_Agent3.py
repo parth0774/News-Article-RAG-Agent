@@ -19,6 +19,7 @@ from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, System
 import logging
 from conversation_manager import conversation_manager
 
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -28,17 +29,23 @@ logging.basicConfig(
 )
 logger = logging.getLogger('LinkedIn_Agent')
 
+# Suppress warnings
 warnings.filterwarnings('ignore')
 
+# Load environment variables
 load_dotenv()
 
 class LinkedInAgent:
     def __init__(self):
+        """Initialize the LinkedIn agent with LLM."""
         try:
+            # Initialize LLM
             self.llm = ChatOpenAI(
-                model="gpt-4o-mini",
+                model="gpt-4-turbo-preview",
                 temperature=0.7
             )
+            
+            # Define the prompt template
             self.prompt = ChatPromptTemplate.from_messages([
                 ("system", """You are a professional LinkedIn post generator.
                 Create engaging, professional, and informative LinkedIn posts based on the provided content.
@@ -64,6 +71,7 @@ class LinkedInAgent:
             raise
     
     def generate_post(self, content: str, context: Optional[Dict[str, Any]] = None) -> str:
+        """Generate a LinkedIn post based on the provided content and context."""
         try:
             logger.info("Generating LinkedIn post...")
             
@@ -100,6 +108,7 @@ class LinkedInAgent:
 
 class RAGSystem:
     def __init__(self):
+        """Initialize the RAG system with hybrid retrieval and NER."""
         try:
             # Initialize embeddings
             self.embeddings = HuggingFaceEmbeddings(
@@ -136,6 +145,7 @@ class RAGSystem:
             raise Exception(f"Failed to initialize RAG system: {str(e)}")
     
     def _load_vector_store(self) -> Chroma:
+        """Load the vector store from the saved directory."""
         persist_dir = os.path.join(
             os.path.dirname(os.path.dirname(__file__)),
             os.getenv("VECTOR_STORE_DIR", r"C:\Users\parth\Desktop\test2\chroma_db")
@@ -150,6 +160,7 @@ class RAGSystem:
                 embedding_function=self.embeddings
             )
             
+            # Verify that the vectorstore has documents
             collection = vectorstore._collection
             docs = collection.get()
             if not docs['ids']:
@@ -161,13 +172,16 @@ class RAGSystem:
             raise Exception(f"Failed to load vector store: {str(e)}")
     
     def _setup_retrievers(self) -> EnsembleRetriever:
+        """Setup the ensemble retriever with semantic and keyword-based search."""
         try:
+            # Get all documents from vector store
             collection = self.vectorstore._collection
             docs = collection.get()
             
             if not docs['ids']:
                 raise ValueError("No documents available for retrieval")
             
+            # Prepare documents for BM25
             bm25_docs = []
             bm25_metadatas = []
             
@@ -175,23 +189,29 @@ class RAGSystem:
                 doc_text = docs['documents'][i]
                 doc_metadata = docs['metadatas'][i]
                 
+                # Split text into chunks
                 chunks = self.text_splitter.split_text(doc_text)
                 
+                # Add chunks to BM25 documents
                 bm25_docs.extend(chunks)
                 bm25_metadatas.extend([doc_metadata] * len(chunks))
             
             if not bm25_docs:
                 raise ValueError("No text chunks available for BM25 retrieval")
             
+            # Initialize BM25 retriever
             bm25_retriever = BM25Retriever.from_texts(
                 bm25_docs,
                 metadatas=bm25_metadatas
             )
-            bm25_retriever.k = min(2, len(bm25_docs))  
+            bm25_retriever.k = min(2, len(bm25_docs))  # Ensure k is not larger than available documents
+            
+            # Initialize vector store retriever
             vector_retriever = self.vectorstore.as_retriever(
-                search_kwargs={"k": min(2, len(docs['ids']))}  
+                search_kwargs={"k": min(2, len(docs['ids']))}  # Ensure k is not larger than available documents
             )
             
+            # Create ensemble retriever
             ensemble_retriever = EnsembleRetriever(
                 retrievers=[bm25_retriever, vector_retriever],
                 weights=[0.5, 0.5] 
@@ -203,15 +223,19 @@ class RAGSystem:
             raise Exception(f"Failed to setup retrievers: {str(e)}")
     
     def _fetch_article_content(self, url: str) -> str:
+        """Fetch article content from a URL."""
         try:
+            # Validate URL
             parsed_url = urlparse(url)
             if not all([parsed_url.scheme, parsed_url.netloc]):
                 return ""
             
+            # Fetch article
             article = Article(url)
             article.download()
             article.parse()
             
+            # Return article text
             return article.text
             
         except Exception as e:
@@ -219,6 +243,7 @@ class RAGSystem:
             return ""
     
     def _setup_rag_chain(self):
+        """Setup the RAG chain with LinkedIn post prompt template."""
         try:
             prompt_template = ChatPromptTemplate.from_messages([
                 ("system", """You are a professional LinkedIn content creator. Create an engaging LinkedIn post based on the provided news articles.
@@ -269,6 +294,7 @@ class RAGSystem:
             raise Exception(f"Failed to setup RAG chain: {str(e)}")
     
     def _extract_entities(self, text: str) -> Dict[str, List[str]]:
+        """Extract named entities from text using spaCy."""
         try:
             doc = self.nlp(text)
             entities = {
@@ -293,12 +319,15 @@ class RAGSystem:
             return {key: [] for key in ["PERSON", "ORG", "GPE", "DATE", "TIME", "MONEY", "PERCENT", "EVENT"]}
     
     def query(self, question: str) -> Dict:
+        """Query the RAG system with a question."""
         try:
             if not question or not question.strip():
                 raise ValueError("Question cannot be empty")
             
+            # Extract entities from the question
             question_entities = self._extract_entities(question)
             
+            # Get documents from ensemble retriever
             docs = self.ensemble_retriever.get_relevant_documents(question)
             
             if not docs:
@@ -309,6 +338,7 @@ class RAGSystem:
                     "question_entities": question_entities
                 }
             
+            # Fetch additional content from links
             enhanced_docs = []
             for doc in docs:
                 if "link" in doc.metadata and doc.metadata["link"]:
@@ -337,10 +367,13 @@ class RAGSystem:
                         "entities": self._extract_entities(doc.page_content)
                     })
                 
+                # Add delay to be respectful to servers
                 time.sleep(1)
             
+            # Generate answer using the chain
             answer = self.chain.invoke(question)
             
+            # Prepare sources
             sources = []
             for doc in enhanced_docs:
                 source_info = {
@@ -370,11 +403,14 @@ class RAGSystem:
             }
 
 def main():
+    """Main function to demonstrate the RAG system."""
     print("Initializing RAG system with hybrid retrieval...")
     
     try:
+        # Initialize RAG system
         rag = RAGSystem()
         
+        # Example query
         question = "Find news about american airlines"
         
         print(f"\nQuestion: {question}")

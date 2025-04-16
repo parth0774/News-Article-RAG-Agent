@@ -7,6 +7,7 @@ from .RAG_Agent2 import RAGSystem
 from .LinkedIn_Agent3 import LinkedInAgent
 from conversation_manager import conversation_manager
 
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -18,10 +19,11 @@ logger = logging.getLogger('Agent1_Orchestrator')
 
 class Orchestrator:
     def __init__(self):
+        """Initialize the orchestrator with RAG and LinkedIn agents."""
         self.rag_agent = RAGSystem()
         self.linkedin_agent = LinkedInAgent()
         self.llm = ChatOpenAI(
-            model="gpt-4o-mini",
+            model="gpt-4-turbo-preview",
             temperature=0.1
         )
         self.prompt = """Analyze the user's query and determine the appropriate action.
@@ -40,6 +42,7 @@ class Orchestrator:
         """
     
     def route_query(self, query: str) -> Dict[str, Any]:
+        """Route the query to the appropriate agent."""
         try:
             response = self.llm.invoke([
                 {"role": "system", "content": self.prompt},
@@ -60,29 +63,60 @@ class Orchestrator:
             }
     
     def process_query(self, query: str) -> Dict[str, str]:
+        """Process a user query through the appropriate agent."""
         try:
-            conversation_id = conversation_manager.create_conversation()
+            # Get existing conversation ID or create a new one
+            conversation_id = conversation_manager.get_shared_context("current_conversation_id")
+            if not conversation_id:
+                conversation_id = conversation_manager.create_conversation()
+                conversation_manager.update_shared_context("current_conversation_id", conversation_id)
+            
             routing_decision = self.route_query(query)
             
+            # Add user query to conversation
+            conversation_manager.add_message(conversation_id, "user", query)
+            
             if routing_decision["agent"] == "rag":
+                # Add interaction from orchestrator to RAG agent
+                conversation_manager.add_agent_interaction(
+                    conversation_id,
+                    "orchestrator",
+                    "rag_agent",
+                    f"Processing news query: {routing_decision['content']}"
+                )
+                
                 result = self.rag_agent.query(routing_decision["content"])
                 
+                # Add RAG agent's response to conversation
                 conversation_manager.add_message(
                     conversation_id,
                     "assistant",
-                    f"Here's the news information:\n{result['answer']}\nSources: {[s['headline'] for s in result['sources']]}"
+                    f"Here's the news information:\n{result['answer']}\nSources: {[s['headline'] for s in result['sources']]}",
+                    "rag_agent"
                 )
                 
                 if routing_decision["query_type"] == "linkedin_post":
+                    # Add interaction from RAG to LinkedIn agent
+                    conversation_manager.add_agent_interaction(
+                        conversation_id,
+                        "rag_agent",
+                        "linkedin_agent",
+                        f"Generating LinkedIn post from news content: {result['answer'][:200]}..."
+                    )
+                    
                     post = self.linkedin_agent.generate_post(
                         result["answer"],
                         context={"conversation_id": conversation_id}
                     )
+                    
+                    # Add LinkedIn agent's response to conversation
                     conversation_manager.add_message(
                         conversation_id,
                         "assistant",
-                        f"Here's your LinkedIn post:\n{post}"
+                        f"Here's your LinkedIn post:\n{post}",
+                        "linkedin_agent"
                     )
+                    
                     return {
                         "agent": "RAG + LinkedIn",
                         "response": post,
@@ -96,15 +130,25 @@ class Orchestrator:
                 }
                 
             elif routing_decision["agent"] == "linkedin":
+                # Add interaction from orchestrator to LinkedIn agent
+                conversation_manager.add_agent_interaction(
+                    conversation_id,
+                    "orchestrator",
+                    "linkedin_agent",
+                    f"Generating LinkedIn post from content: {routing_decision['content'][:200]}..."
+                )
+                
                 post = self.linkedin_agent.generate_post(
                     routing_decision["content"],
                     context={"conversation_id": conversation_id}
                 )
                 
+                # Add LinkedIn agent's response to conversation
                 conversation_manager.add_message(
                     conversation_id,
                     "assistant",
-                    f"Here's your LinkedIn post:\n{post}"
+                    f"Here's your LinkedIn post:\n{post}",
+                    "linkedin_agent"
                 )
                 
                 return {
@@ -127,9 +171,11 @@ class Orchestrator:
                 "details": str(e)
             }
 
+# Create a singleton instance
 orchestrator = Orchestrator()
 
 def process_query(query: str) -> Dict[str, str]:
+    """Process a query using the orchestrator."""
     return orchestrator.process_query(query)
 
 def main(query: str):

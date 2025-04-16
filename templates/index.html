@@ -38,22 +38,11 @@
     </div>
 
     <script>
-        // Debug logging
-        console.log('Script loaded');
-        
-        // Wait for DOM to be fully loaded
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('DOM loaded');
-            
             const sendButton = document.getElementById('sendButton');
             const userInput = document.getElementById('userInput');
             const clearHistoryButton = document.getElementById('clearHistory');
             const clearLogButton = document.getElementById('clearLog');
-            
-            if (!sendButton || !userInput || !clearHistoryButton || !clearLogButton) {
-                console.error('Required elements not found');
-                return;
-            }
             
             sendButton.addEventListener('click', sendMessage);
             userInput.addEventListener('keypress', function(e) {
@@ -64,16 +53,14 @@
 
             function sendMessage() {
                 const message = userInput.value.trim();
-                console.log('Sending message:', message);
-                
                 if (!message) return;
 
                 // Add user message to chat
                 addMessage('user', message);
                 userInput.value = '';
 
-                // Add log entry for user query
-                addLogEntry('User Query', message);
+                // Add initial log entry
+                addLogEntry('User', message);
 
                 // Send to backend
                 fetch('/query', {
@@ -83,16 +70,17 @@
                     },
                     body: JSON.stringify({ query: message })
                 })
-                .then(response => {
-                    console.log('Response received:', response);
-                    return response.json();
-                })
+                .then(response => response.json())
                 .then(data => {
-                    console.log('Response data:', data);
-                    // Add agent response to chat
+                    // Add assistant message to chat
                     addMessage('assistant', data.response);
-                    // Add log entry for agent response
-                    addLogEntry('Agent Response', data.response);
+                    
+                    // Add all logs from the response
+                    if (data.logs && Array.isArray(data.logs)) {
+                        data.logs.forEach(log => {
+                            addLogEntry(log.type, log.content, log.timestamp);
+                        });
+                    }
                 })
                 .catch(error => {
                     console.error('Error:', error);
@@ -102,7 +90,6 @@
             }
 
             function addMessage(role, content) {
-                console.log('Adding message:', role, content);
                 const chatHistory = document.getElementById('chatHistory');
                 const messageDiv = document.createElement('div');
                 messageDiv.className = `message ${role}-message`;
@@ -115,14 +102,14 @@
                     
                     const answerDiv = document.createElement('div');
                     answerDiv.className = 'answer-content';
-                    answerDiv.textContent = answer;
+                    answerDiv.innerHTML = formatText(answer);
                     
                     messageDiv.appendChild(answerDiv);
                     
                     if (sources) {
                         const sourcesDiv = document.createElement('div');
                         sourcesDiv.className = 'sources-content';
-                        sourcesDiv.innerHTML = `<strong>Sources:</strong>${sources}`;
+                        sourcesDiv.innerHTML = `<strong>Sources:</strong>${formatText(sources)}`;
                         messageDiv.appendChild(sourcesDiv);
                     }
                 } else {
@@ -133,16 +120,21 @@
                 chatHistory.scrollTop = chatHistory.scrollHeight;
             }
 
-            function addLogEntry(type, content) {
+            function formatText(text) {
+                // Split text into paragraphs
+                const paragraphs = text.split('\n\n');
+                return paragraphs.map(p => `<p>${p}</p>`).join('');
+            }
+
+            function addLogEntry(type, content, timestamp = new Date().toLocaleTimeString()) {
                 const logContent = document.getElementById('agentLog');
                 const logEntry = document.createElement('div');
-                logEntry.className = 'log-entry';
+                logEntry.className = `log-entry log-${type.toLowerCase()}`;
                 
-                const timestamp = new Date().toLocaleTimeString();
                 logEntry.innerHTML = `
                     <div class="log-timestamp">${timestamp}</div>
                     <div class="log-type">${type}</div>
-                    <div class="log-content">${content}</div>
+                    <div class="log-content">${formatText(content)}</div>
                 `;
                 
                 logContent.appendChild(logEntry);
@@ -150,7 +142,6 @@
             }
 
             function clearHistory() {
-                console.log('Clearing history');
                 document.getElementById('chatHistory').innerHTML = '';
                 fetch('/clear_history', {
                     method: 'POST'

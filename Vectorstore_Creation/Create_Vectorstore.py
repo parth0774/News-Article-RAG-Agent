@@ -44,12 +44,10 @@ def fetch_article_content(url):
         print(f"Error fetching article from {url}: {str(e)}")
         return None
 
-def load_news_data(file_path: str, max_articles: int = 20) -> List[Dict]:
+def load_news_data(file_path: str) -> List[Dict]:
     with open(file_path, 'r', encoding='utf-8') as f:
         articles = []
-        for i, line in enumerate(f):
-            if i >= max_articles:
-                break
+        for line in f:
             article = json.loads(line)
             articles.append(article)
     return articles

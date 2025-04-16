@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_from_directory
 from Agents.Agent1_Orchestrator import process_query
 from conversation_manager import conversation_manager
 import os
@@ -11,7 +11,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Initialize Flask app
-app = Flask(__name__)
+app = Flask(__name__, 
+            static_folder='static',
+            template_folder='templates')
 
 # Initialize LangSmith client with environment variables
 client = Client(
@@ -21,8 +23,7 @@ client = Client(
 
 # Configure LangSmith tracing
 tracer = LangChainTracer(
-    project_name=os.getenv("LANGSMITH_PROJECT"),
-    client=client
+    project_name=os.getenv("LANGSMITH_PROJECT")
 )
 
 callback_manager = CallbackManager([tracer])
@@ -30,6 +31,10 @@ callback_manager = CallbackManager([tracer])
 @app.route('/')
 def home():
     return render_template('index.html')
+
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    return send_from_directory(app.static_folder, filename)
 
 @app.route('/query', methods=['POST'])
 def handle_query():
@@ -41,11 +46,9 @@ def handle_query():
     
     try:
         # Process the query through the orchestrator with tracing
-        with tracer.trace("query_processing"):
-            result = process_query(query)
+        result = process_query(query)
         return jsonify({'response': result['response']})
     except Exception as e:
-        tracer.on_error(e)
         return jsonify({'response': f'Error processing query: {str(e)}'})
 
 @app.route('/clear_history', methods=['POST'])
@@ -55,8 +58,7 @@ def clear_history():
         conversation_manager.initialize()
         return jsonify({'status': 'success'})
     except Exception as e:
-        tracer.on_error(e)
         return jsonify({'status': 'error', 'message': str(e)})
 
 if __name__ == '__main__':
-    app.run(debug=True) 
+    app.run(debug=True, host='0.0.0.0', port=5000) 

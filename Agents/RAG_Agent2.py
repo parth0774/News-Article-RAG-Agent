@@ -39,66 +39,61 @@ load_dotenv()
 
 class RAGSystem:
     def __init__(self):
-        """Initialize the RAG system with hybrid retrieval and NER."""
-        try:
-            # Initialize embeddings
-            self.embeddings = HuggingFaceEmbeddings(
-                model_name=os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-mpnet-base-v2"),
-                model_kwargs={'device': 'cpu'},
-                encode_kwargs={'normalize_embeddings': True}
-            )
-            
-            # Initialize NER model
-            self.nlp = spacy.load("en_core_web_sm")
-            
-            # Load vector store
-            self.vectorstore = self._load_vector_store()
-            
-            # Initialize text splitter
-            self.text_splitter = RecursiveCharacterTextSplitter(
-                chunk_size=1000,
-                chunk_overlap=200
-            )
-            
-            # Setup retrievers
-            self.ensemble_retriever = self._setup_retrievers()
-            
-            # Initialize LLM
-            self.llm = ChatOpenAI(
-                model_name=os.getenv("LLM_MODEL", "gpt-4o-mini"),
-                temperature=float(os.getenv("LLM_TEMPERATURE", 0.1))
-            )
-            
-            # Setup RAG chain
-            self.chain = self._setup_rag_chain()
-            
-            # Define the prompt template with conversation history
-            self.qa_prompt = ChatPromptTemplate.from_messages([
-                SystemMessage(content="""You are a helpful news assistant that provides accurate and relevant information from the knowledge base.
-                Use the provided context to answer questions. If you don't know the answer, say so.
-                Consider the conversation history to provide contextually relevant responses.
-                Extract and highlight important entities (people, organizations, locations, dates) in your response."""),
-                MessagesPlaceholder(variable_name="chat_history"),
-                ("human", "{question}"),
-                ("assistant", "Let me search the knowledge base and provide you with relevant information."),
-            ])
-            
-            # Initialize the QA chain
-            self.qa_chain = RetrievalQA.from_chain_type(
-                llm=self.llm,
-                chain_type="stuff",
-                retriever=self.vectorstore.as_retriever(
-                    search_type="similarity",
-                    search_kwargs={"k": 3}
-                ),
-                return_source_documents=True
-            )
-            
-            logger.info("RAG system initialized successfully")
-            
-        except Exception as e:
-            logger.error(f"Error initializing RAG system: {str(e)}")
-            raise
+        """Initialize the RAG system with vector store and LLM."""
+        # Initialize embeddings
+        self.embeddings = HuggingFaceEmbeddings(
+            model_name=os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-mpnet-base-v2")
+        )
+        
+        # Initialize vector store
+        self.vector_store = Chroma(
+            persist_directory=os.getenv("VECTOR_STORE_DIR", "Vector_Creation_Test/chroma_db"),
+            embedding_function=self.embeddings
+        )
+        
+        # Initialize LLM
+        self.llm = ChatOpenAI(
+            model=os.getenv("LLM_MODEL", "gpt-4o-mini"),
+            temperature=float(os.getenv("LLM_TEMPERATURE", "0.1"))
+        )
+        
+        # Initialize QA chain
+        self.qa_chain = RetrievalQA.from_chain_type(
+            llm=self.llm,
+            chain_type="stuff",
+            retriever=self.vector_store.as_retriever()
+        )
+        
+        # Initialize NER model
+        self.nlp = spacy.load("en_core_web_sm")
+        
+        # Load vector store
+        self.vectorstore = self._load_vector_store()
+        
+        # Initialize text splitter
+        self.text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000,
+            chunk_overlap=200
+        )
+        
+        # Setup retrievers
+        self.ensemble_retriever = self._setup_retrievers()
+        
+        # Setup RAG chain
+        self.chain = self._setup_rag_chain()
+        
+        # Define the prompt template with conversation history
+        self.qa_prompt = ChatPromptTemplate.from_messages([
+            SystemMessage(content="""You are a helpful news assistant that provides accurate and relevant information from the knowledge base.
+            Use the provided context to answer questions. If you don't know the answer, say so.
+            Consider the conversation history to provide contextually relevant responses.
+            Extract and highlight important entities (people, organizations, locations, dates) in your response."""),
+            MessagesPlaceholder(variable_name="chat_history"),
+            ("human", "{question}"),
+            ("assistant", "Let me search the knowledge base and provide you with relevant information."),
+        ])
+        
+        logger.info("RAG system initialized successfully")
     
     def _load_vector_store(self) -> Chroma:
         """Load the vector store from the saved directory."""

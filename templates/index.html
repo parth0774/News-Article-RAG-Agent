@@ -13,67 +13,157 @@
             <button id="clearHistory" class="clear-btn">Clear History</button>
         </header>
         
-        <div class="chat-container">
-            <div id="chatHistory" class="chat-history">
-                <!-- Messages will be added here -->
+        <div class="main-content">
+            <div class="chat-container">
+                <div id="chatHistory" class="chat-history">
+                    <!-- Messages will be added here -->
+                </div>
+                
+                <div class="input-container">
+                    <input type="text" id="userInput" placeholder="Ask about news or request a LinkedIn post...">
+                    <button id="sendButton">Send</button>
+                </div>
             </div>
             
-            <div class="input-container">
-                <input type="text" id="userInput" placeholder="Ask about news or request a LinkedIn post...">
-                <button id="sendButton">Send</button>
+            <div class="log-container">
+                <div class="log-header">
+                    <h3>Agent Log</h3>
+                    <button id="clearLog" class="clear-btn">Clear Log</button>
+                </div>
+                <div id="agentLog" class="log-content">
+                    <!-- Log entries will be added here -->
+                </div>
             </div>
         </div>
     </div>
 
     <script>
-        document.getElementById('sendButton').addEventListener('click', sendMessage);
-        document.getElementById('userInput').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') sendMessage();
+        // Debug logging
+        console.log('Script loaded');
+        
+        // Wait for DOM to be fully loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded');
+            
+            const sendButton = document.getElementById('sendButton');
+            const userInput = document.getElementById('userInput');
+            const clearHistoryButton = document.getElementById('clearHistory');
+            const clearLogButton = document.getElementById('clearLog');
+            
+            if (!sendButton || !userInput || !clearHistoryButton || !clearLogButton) {
+                console.error('Required elements not found');
+                return;
+            }
+            
+            sendButton.addEventListener('click', sendMessage);
+            userInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') sendMessage();
+            });
+            clearHistoryButton.addEventListener('click', clearHistory);
+            clearLogButton.addEventListener('click', clearLog);
+
+            function sendMessage() {
+                const message = userInput.value.trim();
+                console.log('Sending message:', message);
+                
+                if (!message) return;
+
+                // Add user message to chat
+                addMessage('user', message);
+                userInput.value = '';
+
+                // Add log entry for user query
+                addLogEntry('User Query', message);
+
+                // Send to backend
+                fetch('/query', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ query: message })
+                })
+                .then(response => {
+                    console.log('Response received:', response);
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Response data:', data);
+                    // Add agent response to chat
+                    addMessage('assistant', data.response);
+                    // Add log entry for agent response
+                    addLogEntry('Agent Response', data.response);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    addMessage('assistant', 'Sorry, there was an error processing your request.');
+                    addLogEntry('Error', 'Failed to process request');
+                });
+            }
+
+            function addMessage(role, content) {
+                console.log('Adding message:', role, content);
+                const chatHistory = document.getElementById('chatHistory');
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${role}-message`;
+                
+                if (role === 'assistant') {
+                    // Parse the response to separate answer and sources
+                    const parts = content.split('\n\nSources:');
+                    const answer = parts[0];
+                    const sources = parts.length > 1 ? parts[1] : '';
+                    
+                    const answerDiv = document.createElement('div');
+                    answerDiv.className = 'answer-content';
+                    answerDiv.textContent = answer;
+                    
+                    messageDiv.appendChild(answerDiv);
+                    
+                    if (sources) {
+                        const sourcesDiv = document.createElement('div');
+                        sourcesDiv.className = 'sources-content';
+                        sourcesDiv.innerHTML = `<strong>Sources:</strong>${sources}`;
+                        messageDiv.appendChild(sourcesDiv);
+                    }
+                } else {
+                    messageDiv.textContent = content;
+                }
+                
+                chatHistory.appendChild(messageDiv);
+                chatHistory.scrollTop = chatHistory.scrollHeight;
+            }
+
+            function addLogEntry(type, content) {
+                const logContent = document.getElementById('agentLog');
+                const logEntry = document.createElement('div');
+                logEntry.className = 'log-entry';
+                
+                const timestamp = new Date().toLocaleTimeString();
+                logEntry.innerHTML = `
+                    <div class="log-timestamp">${timestamp}</div>
+                    <div class="log-type">${type}</div>
+                    <div class="log-content">${content}</div>
+                `;
+                
+                logContent.appendChild(logEntry);
+                logContent.scrollTop = logContent.scrollHeight;
+            }
+
+            function clearHistory() {
+                console.log('Clearing history');
+                document.getElementById('chatHistory').innerHTML = '';
+                fetch('/clear_history', {
+                    method: 'POST'
+                })
+                .then(response => response.json())
+                .then(data => console.log('Clear history response:', data))
+                .catch(error => console.error('Error clearing history:', error));
+            }
+
+            function clearLog() {
+                document.getElementById('agentLog').innerHTML = '';
+            }
         });
-        document.getElementById('clearHistory').addEventListener('click', clearHistory);
-
-        function sendMessage() {
-            const input = document.getElementById('userInput');
-            const message = input.value.trim();
-            if (!message) return;
-
-            // Add user message to chat
-            addMessage('user', message);
-            input.value = '';
-
-            // Send to backend
-            fetch('/query', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ query: message })
-            })
-            .then(response => response.json())
-            .then(data => {
-                addMessage('assistant', data.response);
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                addMessage('assistant', 'Sorry, there was an error processing your request.');
-            });
-        }
-
-        function addMessage(role, content) {
-            const chatHistory = document.getElementById('chatHistory');
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${role}-message`;
-            messageDiv.textContent = content;
-            chatHistory.appendChild(messageDiv);
-            chatHistory.scrollTop = chatHistory.scrollHeight;
-        }
-
-        function clearHistory() {
-            document.getElementById('chatHistory').innerHTML = '';
-            fetch('/clear_history', {
-                method: 'POST'
-            });
-        }
     </script>
 </body>
 </html> 

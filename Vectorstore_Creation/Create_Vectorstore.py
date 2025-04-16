@@ -1,7 +1,7 @@
 import json
 import os
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings 
 from langchain_community.vectorstores import Chroma
 from langchain.schema import Document
 from newspaper import Article
@@ -89,7 +89,7 @@ def create_vector_store(documents: List[Document], persist_dir: str):
 
 def main():
     print("Loading news data...")
-    articles = load_news_data("News_Category_Dataset_v3.json")
+    articles = load_news_data(r"C:\Users\parth\Desktop\Projects\News-Article-RAG-Agent\News-Article-RAG-Agent\Vectorstore_Creation\News_Category_Dataset_v3.json")
     print(f"Loaded {len(articles)} articles")
     print("Processing articles...")
     documents = process_news_data(articles)

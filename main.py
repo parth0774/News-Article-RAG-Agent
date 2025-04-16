@@ -1,7 +1,7 @@
 import os
 import logging
 from dotenv import load_dotenv
-from Agents import process_query
+from Agents.Agent1_Orchestrator import process_query
 from conversation_manager import conversation_manager
 
 logging.basicConfig(
@@ -54,15 +54,13 @@ def main():
                 
             response = process_query(user_query)
             
-            print("\nAgent Used:", response.get('agent_used', 'Unknown'))
-            print("Processing Details:", response.get('processing_details', 'No details available'))
-            print("\nResponse Content:")
-            print(response.get('content', 'No content available'))
-            
-            if 'sources' in response:
-                print("\nSources:")
-                for source in response['sources']:
-                    print(f"- {source}")
+            print("\n" + "="*50)
+            print(f"Agent: {response['agent']}")
+            print("="*50)
+            print("\nResponse:")
+            print(response['response'])
+            print("\nDetails:", response['details'])
+            print("="*50)
                     
     except KeyboardInterrupt:
         print("\nExiting gracefully...")

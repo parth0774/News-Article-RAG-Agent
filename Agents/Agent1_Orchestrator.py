@@ -21,7 +21,7 @@ class Orchestrator:
         self.rag_agent = RAGSystem()
         self.linkedin_agent = LinkedInAgent()
         self.llm = ChatOpenAI(
-            model="gpt-40-mini",
+            model="gpt-4o-mini",
             temperature=0.1
         )
         self.prompt = """Analyze the user's query and determine the appropriate action.

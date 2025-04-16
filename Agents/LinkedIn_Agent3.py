@@ -36,7 +36,7 @@ class LinkedInAgent:
     def __init__(self):
         try:
             self.llm = ChatOpenAI(
-                model="gpt-40-mini",
+                model="gpt-4o-mini",
                 temperature=0.7
             )
             self.prompt = ChatPromptTemplate.from_messages([

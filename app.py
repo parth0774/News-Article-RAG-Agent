@@ -5,18 +5,26 @@ import os
 from langsmith import Client
 from langchain.callbacks.tracers import LangChainTracer
 from langchain.callbacks.manager import CallbackManager
+from dotenv import load_dotenv
 
-# Initialize LangSmith
-os.environ["LANGSMITH_TRACING"] = "true"
-os.environ["LANGSMITH_ENDPOINT"] = "https://api.smith.langchain.com"
-os.environ["LANGSMITH_PROJECT"] = "News-AI-Agent"
+# Load environment variables
+load_dotenv()
 
 # Initialize Flask app
 app = Flask(__name__)
 
-# Initialize LangSmith client
-client = Client()
-tracer = LangChainTracer()
+# Initialize LangSmith client with environment variables
+client = Client(
+    api_key=os.getenv("LANGSMITH_API_KEY"),
+    api_url=os.getenv("LANGSMITH_ENDPOINT")
+)
+
+# Configure LangSmith tracing
+tracer = LangChainTracer(
+    project_name=os.getenv("LANGSMITH_PROJECT"),
+    client=client
+)
+
 callback_manager = CallbackManager([tracer])
 
 @app.route('/')
@@ -32,10 +40,12 @@ def handle_query():
         return jsonify({'response': 'Please provide a query.'})
     
     try:
-        # Process the query through the orchestrator
-        result = process_query(query)
+        # Process the query through the orchestrator with tracing
+        with tracer.trace("query_processing"):
+            result = process_query(query)
         return jsonify({'response': result['response']})
     except Exception as e:
+        tracer.on_error(e)
         return jsonify({'response': f'Error processing query: {str(e)}'})
 
 @app.route('/clear_history', methods=['POST'])
@@ -45,6 +55,7 @@ def clear_history():
         conversation_manager.initialize()
         return jsonify({'status': 'success'})
     except Exception as e:
+        tracer.on_error(e)
         return jsonify({'status': 'error', 'message': str(e)})
 
 if __name__ == '__main__':

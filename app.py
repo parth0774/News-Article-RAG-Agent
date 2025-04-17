@@ -1,6 +1,5 @@
 from flask import Flask, render_template, request, jsonify, send_from_directory
 from Agents.Agent1_Orchestrator import process_query
-from conversation_manager import conversation_manager
 import os
 from langsmith import Client
 from langchain.callbacks.tracers import LangChainTracer
@@ -92,9 +91,8 @@ def handle_query():
 @app.route('/clear_history', methods=['POST'])
 def clear_history():
     try:
-        # Clear the conversation history
-        conversation_manager.initialize()
-        return jsonify({'status': 'success'})
+        # Return success since we no longer need to manage conversation history
+        return jsonify({'status': 'success', 'message': 'History cleared'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)})
 

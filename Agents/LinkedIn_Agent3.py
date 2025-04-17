@@ -17,7 +17,6 @@ from urllib.parse import urlparse
 import spacy
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
 import logging
-from conversation_manager import conversation_manager
 
 # Configure logging
 logging.basicConfig(
@@ -75,14 +74,9 @@ class LinkedInAgent:
         try:
             logger.info("Generating LinkedIn post...")
             
-            # Get conversation history if available
-            conversation_id = context.get("conversation_id", "default") if context else "default"
-            chat_history = conversation_manager.get_conversation(conversation_id)
-            
             # Prepare the input
             chain_input = {
-                "content": content,
-                "chat_history": chat_history
+                "content": content
             }
             
             # Add context if provided

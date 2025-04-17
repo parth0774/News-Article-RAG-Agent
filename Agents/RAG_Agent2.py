@@ -19,7 +19,6 @@ from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, System
 from langchain_core.prompts import MessagesPlaceholder
 from langchain.chains import RetrievalQA
 import logging
-from conversation_manager import conversation_manager
 
 # Configure logging
 logging.basicConfig(
@@ -259,40 +258,29 @@ class RAGSystem:
                         "metadata": doc.metadata,
                         "entities": self._extract_entities(doc.page_content)
                     })
-                
-                # Add delay to be respectful to servers
-                time.sleep(1)
             
-            # Generate answer using the chain
-            answer = self.chain.invoke(question)
+            # Process the enhanced documents through the RAG chain
+            result = self.chain.invoke(question)
             
-            # Prepare sources
-            sources = []
-            for doc in enhanced_docs:
-                source_info = {
-                    "headline": doc["metadata"].get("headline", "N/A"),
-                    "category": doc["metadata"].get("category", "N/A"),
-                    "date": doc["metadata"].get("date", "N/A"),
-                    "link": doc["metadata"].get("link", "N/A"),
-                    "authors": doc["metadata"].get("authors", "N/A"),
-                    "short_description": doc["metadata"].get("short_description", "N/A"),
-                    "content_preview": doc["content"][:200] + "...",
+            # Prepare the response
+            response = {
+                "answer": result,
+                "sources": [{
+                    "headline": doc["metadata"].get("headline", "Unknown"),
+                    "link": doc["metadata"].get("link", ""),
                     "entities": doc["entities"]
-                }
-                sources.append(source_info)
-            
-            return {
-                "answer": answer,
-                "sources": sources,
+                } for doc in enhanced_docs],
                 "question_entities": question_entities
             }
             
+            return response
+            
         except Exception as e:
+            logger.error(f"Error in query: {str(e)}")
             return {
-                "error": str(e),
-                "answer": None,
-                "sources": None,
-                "question_entities": None
+                "answer": "I encountered an error while processing your query.",
+                "sources": [],
+                "question_entities": {}
             }
 
     def process_query(self, query: str, context: Optional[Dict[str, Any]] = None) -> str:

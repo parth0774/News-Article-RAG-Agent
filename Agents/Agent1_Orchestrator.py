@@ -5,7 +5,6 @@ from typing import Dict, Any
 from langchain_openai import ChatOpenAI
 from Agents.RAG_Agent2 import RAGSystem
 from Agents.LinkedIn_Agent3 import LinkedInAgent
-from conversation_manager import conversation_manager
 
 # Configure logging
 logging.basicConfig(
@@ -68,9 +67,6 @@ class Orchestrator:
     def process_query(self, query: str) -> Dict[str, str]:
         """Process a user query through the appropriate agent."""
         try:
-            # Generate a unique conversation ID
-            conversation_id = conversation_manager.create_conversation()
-            
             # Route the query
             routing_decision = self.route_query(query)
             
@@ -79,23 +75,11 @@ class Orchestrator:
                 # Get news information
                 result = self.rag_agent.query(routing_decision["content"])
                 
-                # Update conversation history
-                conversation_manager.add_message(
-                    conversation_id,
-                    "assistant",
-                    f"Here's the news information:\n{result['answer']}\nSources: {[s['headline'] for s in result['sources']]}"
-                )
-                
                 # If this was for a LinkedIn post, generate the post
                 if routing_decision["query_type"] == "linkedin_post":
                     post = self.linkedin_agent.generate_post(
                         result["answer"],
-                        context={"conversation_id": conversation_id}
-                    )
-                    conversation_manager.add_message(
-                        conversation_id,
-                        "assistant",
-                        f"Here's your LinkedIn post:\n{post}"
+                        context={}
                     )
                     return {
                         "agent": "RAG + LinkedIn",
@@ -113,14 +97,7 @@ class Orchestrator:
                 # Generate LinkedIn post directly
                 post = self.linkedin_agent.generate_post(
                     routing_decision["content"],
-                    context={"conversation_id": conversation_id}
-                )
-                
-                # Update conversation history
-                conversation_manager.add_message(
-                    conversation_id,
-                    "assistant",
-                    f"Here's your LinkedIn post:\n{post}"
+                    context={}
                 )
                 
                 return {

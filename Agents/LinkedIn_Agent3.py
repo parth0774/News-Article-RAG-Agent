@@ -41,7 +41,7 @@ class LinkedInAgent:
         try:
             # Initialize LLM
             self.llm = ChatOpenAI(
-                model="gpt-40-mini",
+                model="gpt-4o-mini",
                 temperature=0.7
             )
             

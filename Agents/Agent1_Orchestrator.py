@@ -24,7 +24,7 @@ class Orchestrator:
         self.rag_agent = RAGSystem()
         self.linkedin_agent = LinkedInAgent()
         self.llm = ChatOpenAI(
-            model="gpt-4-turbo-preview",
+            model="gpt-4",
             temperature=0.1
         )
         self.prompt = """Analyze the user's query and determine the appropriate action.
@@ -40,6 +40,8 @@ class Orchestrator:
         1. If the query is about news or current events -> route to RAG
         2. If the query is about creating a LinkedIn post with provided content -> route to LinkedIn
         3. If the query is about creating a LinkedIn post about a topic -> route to RAG first, then LinkedIn
+        4. If user ask for post related to any topic but do not provide any content -> route to RAG first, then LinkedIn
+        5. If user provide content and ask for LinkedIn post, then route to LinkedIn
         """
     
     def route_query(self, query: str) -> Dict[str, Any]:

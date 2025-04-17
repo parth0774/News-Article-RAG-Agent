@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from Agents.Agent1_Orchestrator import process_query, orchestrator
 from conversation_manager import conversation_manager
 
-# Configure logging
+# Configure logging to only show in terminal
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -85,7 +85,7 @@ def main():
     except KeyboardInterrupt:
         print("\nExiting gracefully...")
     except Exception as e:
-        logging.error(f"An error occurred: {str(e)}")
+        logger.error(f"An error occurred: {str(e)}")
         print(f"\nAn error occurred: {str(e)}")
     finally:
         conversation_manager.cleanup()

@@ -20,7 +20,6 @@ from langchain_core.prompts import MessagesPlaceholder
 from langchain.chains import RetrievalQA
 import logging
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -30,52 +29,40 @@ logging.basicConfig(
 )
 logger = logging.getLogger('RAG_Agent')
 
-# Suppress warnings
 warnings.filterwarnings('ignore')
 
-# Load environment variables
 load_dotenv()
 
 class RAGSystem:
     def __init__(self):
-        """Initialize the RAG system with vector store and LLM."""
-        # Initialize embeddings
         self.embeddings = HuggingFaceEmbeddings(
             model_name=os.getenv("EMBEDDING_MODEL", "sentence-transformers/all-mpnet-base-v2")
         )
         
-        # Initialize vector store
         self.vectorstore = self._load_vector_store()
         
-        # Initialize LLM
         self.llm = ChatOpenAI(
             model=os.getenv("LLM_MODEL"),
             temperature=float(os.getenv("LLM_TEMPERATURE", "0.1"))
         )
         
-        # Initialize QA chain
         self.qa_chain = RetrievalQA.from_chain_type(
             llm=self.llm,
             chain_type="stuff",
             retriever=self.vectorstore.as_retriever()
         )
         
-        # Initialize NER model
         self.nlp = spacy.load("en_core_web_sm")
         
-        # Initialize text splitter
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,
             chunk_overlap=200
         )
         
-        # Setup retrievers
         self.ensemble_retriever = self._setup_retrievers()
         
-        # Setup RAG chain
         self.chain = self._setup_rag_chain()
         
-        # Define the prompt template with conversation history
         self.qa_prompt = ChatPromptTemplate.from_messages([
             SystemMessage(content="""You are a helpful news assistant that provides accurate and relevant information from the knowledge base.
             Use the provided context to answer questions. If you don't know the answer, say so.
@@ -89,7 +76,6 @@ class RAGSystem:
         logger.info("RAG system initialized successfully")
     
     def _load_vector_store(self) -> Chroma:
-        """Load the vector store from the saved directory."""
         persist_dir = os.path.join(
             os.path.dirname(os.path.dirname(__file__)),
             os.getenv("VECTOR_STORE_DIR", r"C:\Users\parth\Desktop\test2\chroma_db")
@@ -104,12 +90,9 @@ class RAGSystem:
         )
     
     def _setup_retrievers(self) -> EnsembleRetriever:
-        """Setup the ensemble retriever with semantic and keyword-based search."""
-        # Get all documents from vector store
         collection = self.vectorstore._collection
         docs = collection.get()
         
-        # Prepare documents for BM25
         bm25_docs = []
         bm25_metadatas = []
         
@@ -117,26 +100,21 @@ class RAGSystem:
             doc_text = docs['documents'][i]
             doc_metadata = docs['metadatas'][i]
             
-            # Split text into chunks
             chunks = self.text_splitter.split_text(doc_text)
             
-            # Add chunks to BM25 documents
             bm25_docs.extend(chunks)
             bm25_metadatas.extend([doc_metadata] * len(chunks))
         
-        # Initialize BM25 retriever
         bm25_retriever = BM25Retriever.from_texts(
             bm25_docs,
             metadatas=bm25_metadatas
         )
         bm25_retriever.k = 2
         
-        # Initialize vector store retriever
         vector_retriever = self.vectorstore.as_retriever(
             search_kwargs={"k": 2}
         )
         
-        # Create ensemble retriever
         ensemble_retriever = EnsembleRetriever(
             retrievers=[bm25_retriever, vector_retriever],
             weights=[0.5, 0.5] 
@@ -145,19 +123,15 @@ class RAGSystem:
         return ensemble_retriever
     
     def _fetch_article_content(self, url: str) -> str:
-        """Fetch article content from a URL."""
         try:
-            # Validate URL
             parsed_url = urlparse(url)
             if not all([parsed_url.scheme, parsed_url.netloc]):
                 return ""
             
-            # Fetch article
             article = Article(url)
             article.download()
             article.parse()
             
-            # Return article text
             return article.text
             
         except Exception as e:
@@ -165,7 +139,6 @@ class RAGSystem:
             return ""
     
     def _setup_rag_chain(self):
-        """Setup the RAG chain with prompt template."""
         prompt_template = ChatPromptTemplate.from_messages([
             ("system", """You are a helpful news assistant. Analyze the provided news articles to answer the question.
             
@@ -196,7 +169,6 @@ class RAGSystem:
         )
     
     def _extract_entities(self, text: str) -> Dict[str, List[str]]:
-        """Extract named entities from text using spaCy."""
         doc = self.nlp(text)
         entities = {
             "PERSON": [],
@@ -216,24 +188,18 @@ class RAGSystem:
         return entities
     
     def query(self, question: str) -> Dict:
-        """Query the RAG system with a question."""
         try:
-            # Extract entities from the question
             question_entities = self._extract_entities(question)
             
-            # Get documents from ensemble retriever
             docs = self.ensemble_retriever.get_relevant_documents(question)
             
-            # Fetch additional content from links
             enhanced_docs = []
             for doc in docs:
                 if "link" in doc.metadata and doc.metadata["link"]:
                     logger.info(f"Fetching additional content from: {doc.metadata['link']}")
                     additional_content = self._fetch_article_content(doc.metadata["link"])
                     if additional_content:
-                        # Extract entities from the content
                         content_entities = self._extract_entities(additional_content)
-                        # Combine original content with additional content
                         enhanced_content = f"{doc.page_content}\n\nAdditional content from article:\n{additional_content}"
                         enhanced_docs.append({
                             "content": enhanced_content,
@@ -253,10 +219,8 @@ class RAGSystem:
                         "entities": self._extract_entities(doc.page_content)
                     })
             
-            # Process the enhanced documents through the RAG chain
             result = self.chain.invoke(question)
             
-            # Prepare the response
             response = {
                 "answer": result,
                 "sources": [{
@@ -278,25 +242,20 @@ class RAGSystem:
             }
 
     def process_query(self, query: str, context: Optional[Dict[str, Any]] = None) -> str:
-        """Process a query and return a formatted response."""
         try:
             logger.info(f"Processing query: {query}")
             
-            # Extract entities from the query
             entities = self._extract_entities(query)
             logger.info(f"Extracted entities: {entities}")
             
-            # Get response from the RAG chain
             result = self.query(query)
             
-            # Format the response
             response = f"{result['answer']}\n\nSources:\n"
             for i, source in enumerate(result['sources'], 1):
                 response += f"{i}. {source['headline']}\n"
                 if source['link']:
                     response += f"   Link: {source['link']}\n"
             
-            # Add entities to the response
             response += "\nKey Entities:\n"
             for entity_type, entity_list in result['question_entities'].items():
                 if entity_list:
@@ -310,14 +269,11 @@ class RAGSystem:
             return f"I encountered an error while processing your query: {str(e)}"
 
 def main():
-    """Main function to demonstrate the RAG system."""
     print("Initializing RAG system with hybrid retrieval...")
     
     try:
-        # Initialize RAG system
         rag = RAGSystem()
         
-        # Example query
         question = "Find news about american airlines"
         
         print(f"\nQuestion: {question}")

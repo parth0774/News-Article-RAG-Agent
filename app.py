@@ -7,21 +7,17 @@ from langchain.callbacks.manager import CallbackManager
 from dotenv import load_dotenv
 from datetime import datetime
 
-# Load environment variables
 load_dotenv()
 
-# Initialize Flask app
 app = Flask(__name__, 
             static_folder='static',
             template_folder='templates')
 
-# Initialize LangSmith client with environment variables
 client = Client(
     api_key=os.getenv("LANGSMITH_API_KEY"),
     api_url=os.getenv("LANGSMITH_ENDPOINT")
 )
 
-# Configure LangSmith tracing
 tracer = LangChainTracer(
     project_name=os.getenv("LANGSMITH_PROJECT")
 )
@@ -52,10 +48,8 @@ def handle_query():
         })
     
     try:
-        # Process the query through the orchestrator with tracing
         result = process_query(query)
         
-        # Create detailed logs
         logs = [
             {
                 'type': 'System',
@@ -91,7 +85,6 @@ def handle_query():
 @app.route('/clear_history', methods=['POST'])
 def clear_history():
     try:
-        # Return success since we no longer need to manage conversation history
         return jsonify({'status': 'success', 'message': 'History cleared'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)})

@@ -55,10 +55,8 @@ def load_news_data(file_path: str) -> List[Dict]:
 def process_news_data(articles: List[Dict]) -> List[Document]:
     documents = []
     for article in articles:
-        # Combine headline and short_description for better context
         content = f"{article['headline']}\n\n{article['short_description']}"
         
-        # Create document with all metadata fields
         doc = Document(
             page_content=content,
             metadata={
@@ -89,7 +87,6 @@ def create_vector_store(documents: List[Document], persist_dir: str):
 
 def main():
     print("Loading news data...")
-    # Get the directory of the current script
     script_dir = os.path.dirname(os.path.abspath(__file__))
     json_path = os.path.join(script_dir, "News_Category_Dataset_v3.json")
     articles = load_news_data(json_path)

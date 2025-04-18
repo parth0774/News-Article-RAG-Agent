@@ -6,7 +6,6 @@ from langchain_openai import ChatOpenAI
 from Agents.RAG_Agent2 import RAGSystem
 from Agents.LinkedIn_Agent3 import LinkedInAgent
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -19,7 +18,6 @@ logger = logging.getLogger('Agent1_Orchestrator')
 
 class Orchestrator:
     def __init__(self):
-        """Initialize the orchestrator with RAG and LinkedIn agents."""
         self.rag_agent = RAGSystem()
         self.linkedin_agent = LinkedInAgent()
         self.llm = ChatOpenAI(
@@ -44,7 +42,6 @@ class Orchestrator:
         """
     
     def route_query(self, query: str) -> Dict[str, Any]:
-        """Route the query to the appropriate agent."""
         try:
             response = self.llm.invoke([
                 {"role": "system", "content": self.prompt},
@@ -65,7 +62,6 @@ class Orchestrator:
             }
     
     def process_query(self, query: str) -> Dict[str, str]:
-        """Process a user query through the appropriate agent."""
         try:
             # Route the query
             routing_decision = self.route_query(query)
@@ -94,7 +90,6 @@ class Orchestrator:
                 }
                 
             elif routing_decision["agent"] == "linkedin":
-                # Generate LinkedIn post directly
                 post = self.linkedin_agent.generate_post(
                     routing_decision["content"],
                     context={}
@@ -120,11 +115,9 @@ class Orchestrator:
                 "details": str(e)
             }
 
-# Create a singleton instance
 orchestrator = Orchestrator()
 
 def process_query(query: str) -> Dict[str, str]:
-    """Process a query using the orchestrator."""
     return orchestrator.process_query(query)
 
 def main():

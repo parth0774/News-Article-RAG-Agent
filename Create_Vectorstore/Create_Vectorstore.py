@@ -89,7 +89,10 @@ def create_vector_store(documents: List[Document], persist_dir: str):
 
 def main():
     print("Loading news data...")
-    articles = load_news_data(r"C:\Users\parth\Desktop\Projects\News-Article-RAG-Agent\News-Article-RAG-Agent\Vectorstore_Creation\News_Category_Dataset_v3.json")
+    # Get the directory of the current script
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    json_path = os.path.join(script_dir, "News_Category_Dataset_v3.json")
+    articles = load_news_data(json_path)
     print(f"Loaded {len(articles)} articles")
     print("Processing articles...")
     documents = process_news_data(articles)

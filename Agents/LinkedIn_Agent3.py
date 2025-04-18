@@ -128,7 +128,7 @@ class RAGSystem:
             
             # Initialize LLM
             self.llm = ChatOpenAI(
-                model_name=os.getenv("LLM_MODEL", "gpt-4o-mini"),
+                model_name=os.getenv("LLM_MODEL"),
                 temperature=float(os.getenv("LLM_TEMPERATURE", 0.1))
             )
             

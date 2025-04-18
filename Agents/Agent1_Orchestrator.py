@@ -18,28 +18,42 @@ logger = logging.getLogger('Agent1_Orchestrator')
 
 class Orchestrator:
     def __init__(self):
-        self.rag_agent = RAGSystem()
-        self.linkedin_agent = LinkedInAgent()
-        self.llm = ChatOpenAI(
-            model=os.getenv("LLM_MODEL"),
-            temperature=float(os.getenv("LLM_TEMPERATURE", "0.1"))
-        )
-        self.prompt = """Analyze the user's query and determine the appropriate action.
-        Return a JSON response with the following structure:
-        {
-            "agent": "rag" or "linkedin",
-            "query_type": "news_query" or "linkedin_post",
-            "needs_news": true or false,
-            "content": "original query or extracted content"
-        }
-        
-        Rules:
-        1. If the query is about news or current events -> route to RAG
-        2. If the query is about creating a LinkedIn post with provided content -> route to LinkedIn
-        3. If the query is about creating a LinkedIn post about a topic -> route to RAG first, then LinkedIn
-        4. If user ask for post related to any topic but do not provide any content -> route to RAG first, then LinkedIn
-        5. If user provide content and ask for LinkedIn post, then route to LinkedIn
-        """
+        try:
+            logger.info("Initializing RAG agent...")
+            self.rag_agent = RAGSystem()
+            logger.info("RAG agent initialized successfully")
+            
+            logger.info("Initializing LinkedIn agent...")
+            self.linkedin_agent = LinkedInAgent()
+            logger.info("LinkedIn agent initialized successfully")
+            
+            self.llm = ChatOpenAI(
+                model=os.getenv("LLM_MODEL"),
+                temperature=float(os.getenv("LLM_TEMPERATURE", "0.1"))
+            )
+            
+            self.prompt = """Analyze the user's query and determine the appropriate action.
+            Return a JSON response with the following structure:
+            {
+                "agent": "rag" or "linkedin",
+                "query_type": "news_query" or "linkedin_post",
+                "needs_news": true or false,
+                "content": "original query or extracted content"
+            }
+            
+            Rules:
+            1. If the query is about news or current events -> route to RAG
+            2. If the query is about creating a LinkedIn post with provided content -> route to LinkedIn
+            3. If the query is about creating a LinkedIn post about a topic -> route to RAG first, then LinkedIn
+            4. If user ask for post related to any topic but do not provide any content -> route to RAG first, then LinkedIn
+            5. If user provide content and ask for LinkedIn post, then route to LinkedIn
+            """
+            
+            logger.info("Orchestrator initialized successfully")
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize Orchestrator: {str(e)}")
+            raise
     
     def route_query(self, query: str) -> Dict[str, Any]:
         try:

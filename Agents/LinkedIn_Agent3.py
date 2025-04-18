@@ -122,7 +122,8 @@ class RAGSystem:
     def _load_vector_store(self) -> Chroma:
         persist_dir = os.path.join(
             os.path.dirname(os.path.dirname(__file__)),
-            os.getenv("VECTOR_STORE_DIR", r"C:\Users\parth\Desktop\test2\chroma_db")
+            "Create_Vectorstore",
+            "chroma_db"
         )
         
         if not os.path.exists(persist_dir):

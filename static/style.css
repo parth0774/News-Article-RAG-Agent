@@ -248,4 +248,33 @@ button:hover {
 
 ::-webkit-scrollbar-thumb:hover {
     background: #3a8eff;
+}
+
+.header-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.model-select {
+    padding: 8px 12px;
+    background: rgba(30, 30, 30, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    color: #e0e0e0;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.model-select:focus {
+    outline: none;
+    border-color: #4a9eff;
+    box-shadow: 0 0 10px rgba(74, 158, 255, 0.2);
+}
+
+.model-select option {
+    background: #1a1a1a;
+    color: #e0e0e0;
+    padding: 8px;
 } 

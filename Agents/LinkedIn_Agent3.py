@@ -40,8 +40,8 @@ class LinkedInAgent:
         try:
             # Initialize LLM
             self.llm = ChatOpenAI(
-                model="gpt-4o-mini",
-                temperature=0.7
+                model=os.getenv("LLM_MODEL"),
+                temperature=float(os.getenv("LLM_TEMPERATURE", "0.7"))
             )
             
             # Define the prompt template

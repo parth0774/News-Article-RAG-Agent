@@ -23,8 +23,8 @@ class Orchestrator:
         self.rag_agent = RAGSystem()
         self.linkedin_agent = LinkedInAgent()
         self.llm = ChatOpenAI(
-            model="gpt-4",
-            temperature=0.1
+            model=os.getenv("LLM_MODEL"),
+            temperature=float(os.getenv("LLM_TEMPERATURE", "0.1"))
         )
         self.prompt = """Analyze the user's query and determine the appropriate action.
         Return a JSON response with the following structure:

@@ -45,14 +45,11 @@ class RAGSystem:
         )
         
         # Initialize vector store
-        self.vector_store = Chroma(
-            persist_directory=os.getenv("VECTOR_STORE_DIR", "Vector_Creation_Test/chroma_db"),
-            embedding_function=self.embeddings
-        )
+        self.vectorstore = self._load_vector_store()
         
         # Initialize LLM
         self.llm = ChatOpenAI(
-            model=os.getenv("LLM_MODEL", "gpt-4o-mini"),
+            model=os.getenv("LLM_MODEL"),
             temperature=float(os.getenv("LLM_TEMPERATURE", "0.1"))
         )
         
@@ -60,14 +57,11 @@ class RAGSystem:
         self.qa_chain = RetrievalQA.from_chain_type(
             llm=self.llm,
             chain_type="stuff",
-            retriever=self.vector_store.as_retriever()
+            retriever=self.vectorstore.as_retriever()
         )
         
         # Initialize NER model
         self.nlp = spacy.load("en_core_web_sm")
-        
-        # Load vector store
-        self.vectorstore = self._load_vector_store()
         
         # Initialize text splitter
         self.text_splitter = RecursiveCharacterTextSplitter(
@@ -234,7 +228,7 @@ class RAGSystem:
             enhanced_docs = []
             for doc in docs:
                 if "link" in doc.metadata and doc.metadata["link"]:
-                    print(f"Fetching additional content from: {doc.metadata['link']}")
+                    logger.info(f"Fetching additional content from: {doc.metadata['link']}")
                     additional_content = self._fetch_article_content(doc.metadata["link"])
                     if additional_content:
                         # Extract entities from the content
@@ -284,6 +278,7 @@ class RAGSystem:
             }
 
     def process_query(self, query: str, context: Optional[Dict[str, Any]] = None) -> str:
+        """Process a query and return a formatted response."""
         try:
             logger.info(f"Processing query: {query}")
             
@@ -291,53 +286,28 @@ class RAGSystem:
             entities = self._extract_entities(query)
             logger.info(f"Extracted entities: {entities}")
             
-            # Get conversation history from the manager
-            conversation_id = context.get("conversation_id", "default")
-            chat_history = conversation_manager.get_conversation(conversation_id)
+            # Get response from the RAG chain
+            result = self.query(query)
             
-            # Add user query to conversation history
-            conversation_manager.add_message(conversation_id, "user", query)
-            
-            # Prepare the input for the QA chain
-            chain_input = {
-                "question": query,
-                "chat_history": chat_history
-            }
-            
-            # Add context if provided
-            if context:
-                chain_input.update(context)
-            
-            # Get response from the QA chain
-            result = self.qa_chain.invoke(chain_input)
-            
-            # Extract the answer and sources
-            answer = result.get("result", "I couldn't find an answer to your question.")
-            source_docs = result.get("source_documents", [])
-            
-            # Format the response with sources and entities
-            response = f"{answer}\n\nSources:\n"
-            for i, doc in enumerate(source_docs, 1):
-                response += f"{i}. {doc.metadata.get('source', 'Unknown source')}\n"
+            # Format the response
+            response = f"{result['answer']}\n\nSources:\n"
+            for i, source in enumerate(result['sources'], 1):
+                response += f"{i}. {source['headline']}\n"
+                if source['link']:
+                    response += f"   Link: {source['link']}\n"
             
             # Add entities to the response
             response += "\nKey Entities:\n"
-            for entity_type, entity_list in entities.items():
+            for entity_type, entity_list in result['question_entities'].items():
                 if entity_list:
                     response += f"{entity_type}: {', '.join(entity_list)}\n"
             
-            # Add assistant response to conversation history
-            conversation_manager.add_message(conversation_id, "assistant", response)
-            
-            # Log the response
-            logger.info(f"Generated response with {len(source_docs)} sources and {len(entities)} entity types")
-            
+            logger.info(f"Generated response with {len(result['sources'])} sources")
             return response
             
         except Exception as e:
             logger.error(f"Error processing query: {str(e)}")
-            error_message = f"I encountered an error while processing your query: {str(e)}"
-            return error_message
+            return f"I encountered an error while processing your query: {str(e)}"
 
 def main():
     """Main function to demonstrate the RAG system."""
@@ -348,32 +318,16 @@ def main():
         rag = RAGSystem()
         
         # Example query
-        question = "Find news about americal airlines"
+        question = "Find news about american airlines"
         
         print(f"\nQuestion: {question}")
-        result = rag.query(question)
+        result = rag.process_query(question)
         
-        if result.get("error"):
-            print(f"Error: {result['error']}")
-            return
-            
-        print("\nAnswer:")
-        print(result["answer"])
-        
-        print("\nSources:")
-        for i, source in enumerate(result["sources"], 1):
-            print(f"\nSource {i}:")
-            print(f"Headline: {source['headline']}")
-            print(f"Category: {source['category']}")
-            print(f"Date: {source['date']}")
-            print(f"Authors: {source['authors']}")
-            if source['link']:
-                print(f"Link: {source['link']}")
-            print(f"Description: {source['short_description']}")
-            print(f"Content Preview: {source['content_preview']}")
-        print("-" * 50)
+        print("\nResponse:")
+        print(result)
             
     except Exception as e:
+        logger.error(f"Error in main: {str(e)}")
         print(f"Error initializing RAG system: {str(e)}")
 
 if __name__ == "__main__":

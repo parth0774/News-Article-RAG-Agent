@@ -12,7 +12,14 @@
     <div class="container">
         <header>
             <h1>News AI Agent</h1>
-            <button id="clearHistory" class="clear-btn">Clear History</button>
+            <div class="header-controls">
+                <select id="modelSelect" class="model-select">
+                    <option value="gpt-4o-mini">GPT-4 Mini</option>
+                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                    <option value="gemini-pro">Gemini Pro</option>
+                </select>
+                <button id="clearHistory" class="clear-btn">Clear History</button>
+            </div>
         </header>
         
         <div class="main-content">
@@ -103,6 +110,7 @@
             const userInput = document.getElementById('userInput');
             const clearHistoryButton = document.getElementById('clearHistory');
             const clearLogButton = document.getElementById('clearLog');
+            const modelSelect = document.getElementById('modelSelect');
             
             sendButton.addEventListener('click', sendMessage);
             userInput.addEventListener('keypress', function(e) {
@@ -110,6 +118,30 @@
             });
             clearHistoryButton.addEventListener('click', clearHistory);
             clearLogButton.addEventListener('click', clearLog);
+            modelSelect.addEventListener('change', changeModel);
+
+            function changeModel() {
+                const selectedModel = modelSelect.value;
+                fetch('/change_model', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ model: selectedModel })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        addLogEntry('System', `Changed model to ${selectedModel}`);
+                    } else {
+                        addLogEntry('Error', data.error || 'Failed to change model');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    addLogEntry('Error', 'Failed to change model');
+                });
+            }
 
             function sendMessage() {
                 const message = userInput.value.trim();
@@ -128,7 +160,10 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ query: message })
+                    body: JSON.stringify({ 
+                        query: message,
+                        model: modelSelect.value
+                    })
                 })
                 .then(response => response.json())
                 .then(data => {

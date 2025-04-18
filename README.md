@@ -63,6 +63,27 @@ echo "LANGSMITH_ENDPOINT=your_endpoint_url" > .env
 python app.py
 ```
 
+## Project Structure
+```
+News-Article-RAG-Agent/
+├── Agents/                      # Core agent implementations
+│   ├── Agent1_Orchestrator.py   # Main orchestrator agent
+│   ├── RAG_Agent2.py           # RAG implementation agent
+│   └── LinkedIn_Agent3.py      # LinkedIn post generation agent
+├── Create_Vectorstore/          # Vector database creation and management
+│   ├── Create_Vectorstore.py   # Script to create vector store
+│   ├── Inspect_Vectorstore.py  # Vector store inspection utilities
+│   ├── chroma_db/              # Vector database storage
+│   ├── inspection_results/     # Inspection output directory
+│   └── News_Category_Dataset_v3.json  # Source news dataset
+├── static/                      # Static web assets
+├── templates/                   # Web application templates
+├── Test/                        # Test files and utilities
+├── app.py                       # Main application entry point
+├── requirements.txt             # Project dependencies
+└── README.md                    # Project documentation
+```
+
 ## Key Features
 - **Intelligent Query Routing**: Automatically determines whether user queries require news retrieval, LinkedIn post generation, or both
 - **Hybrid Retrieval System**: Combines semantic and keyword-based search for improved accuracy
